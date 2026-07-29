@@ -1,43 +1,63 @@
 import json
 import os
+import logging
 import httpx
 from typing import Dict, Any
 
+logger = logging.getLogger("uvicorn.error")
+
+
 class AIService:
     def __init__(self):
-        # Defaulting to Gemini for this example, can be swapped via env variables.
         self.api_key = os.getenv("AI_API_KEY")
-        self.provider = os.getenv("AI_PROVIDER", "gemini") 
+        self.provider = os.getenv("AI_PROVIDER", "gemini")
 
     async def extract_job_details(self, text: str) -> Dict[str, Any]:
+        if not self.api_key:
+            raise ValueError(
+                "AI_API_KEY is not set on the server. Add it in your backend's "
+                "environment variables on Render."
+            )
+
         prompt = f"""
-        Extract the following job details from the text below. 
-        Return ONLY a valid JSON object with these exact keys (use null if missing): 
-        "company", "role", "location", "employmentType", "deadline", "skills" (array of strings), 
+        Extract the following job details from the text below.
+        Return ONLY a valid JSON object with these exact keys (use null if missing):
+        "company", "role", "location", "employmentType", "deadline", "skills" (array of strings),
         "experience", "batch", "salary", "jobLink","jobID", "status" (default to "Saved"), "notes" (any extra useful info).
-        
+
         Text:
         {text}
         """
 
         if self.provider == "gemini":
             return await self._call_gemini(prompt)
-        # Add elif self.provider == "openai": ... here later
-        
-        return {}
+
+        raise ValueError(f"Unsupported AI_PROVIDER: {self.provider}")
 
     async def _call_gemini(self, prompt: str) -> Dict[str, Any]:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={self.api_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"response_mime_type": "application/json"}
+            "generationConfig": {"response_mime_type": "application/json"},
         }
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            response = await client.post(url, json=payload)
-            response.raise_for_status()
-            data = response.json()
-            try:
-                content = data['candidates'][0]['content']['parts'][0]['text']
-                return json.loads(content)
-            except (KeyError, json.JSONDecodeError):
-                return {}
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                response = await client.post(url, json=payload)
+                response.raise_for_status()
+                data = response.json()
+        except httpx.HTTPStatusError as e:
+            logger.error(f"Gemini API error: {e.response.status_code} - {e.response.text}")
+            raise ValueError(
+                f"Gemini API rejected the request ({e.response.status_code}). "
+                f"Check that AI_API_KEY is valid. Details: {e.response.text[:200]}"
+            )
+        except httpx.RequestError as e:
+            logger.error(f"Gemini network error: {e}")
+            raise ValueError(f"Could not reach Gemini API: {e}")
+
+        try:
+            content = data['candidates'][0]['content']['parts'][0]['text']
+            return json.loads(content)
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            logger.error(f"Gemini response parsing failed: {data}")
+            raise ValueError(f"Gemini returned an unexpected response format: {e}")

@@ -6,14 +6,18 @@ from services.scraper import extract_text_from_url
 from services.ai import AIService
 from services.sheets import SheetsService
 import re
+import logging
+import traceback
 
 load_dotenv()
+
+logger = logging.getLogger("uvicorn.error")
 
 app = FastAPI(title="AI Job Tracker MVP")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For MVP, allow all. Restrict in production.
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,26 +44,23 @@ async def save_job(request: JobRequest):
     try:
         content = request.input_text
 
-        # If input is just a URL, scrape it
         if re.match(r'^https?://', content) and len(content.split()) == 1:
             content = await extract_text_from_url(content)
 
-        # 1. Extract JSON via AI
         job_data = await ai_service.extract_job_details(content)
 
-        # Preserve original link if input was a link
         if re.match(r'^https?://', request.input_text):
             job_data["jobLink"] = request.input_text
 
-        # 2. Append to Sheet
         sheets_service.append_job(request.sheet_url, job_data)
 
         return {"status": "success", "data": job_data}
     except ValueError as e:
-        # Known, user-facing errors (bad sheet URL, permissions, etc.)
+        logger.warning(f"Handled error in /api/jobs: {e}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Unhandled error in /api/jobs: {traceback.format_exc()}")
+        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
 
 
 @app.get("/api/jobs")
@@ -73,6 +74,7 @@ async def get_jobs(sheet_url: str = Query(..., description="The Google Sheet URL
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        logger.error(f"Unhandled error in GET /api/jobs: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
