@@ -1,0 +1,15 @@
+# Python / Backend
+backend/venv/
+backend/__pycache__/
+backend/.env
+backend/credentials.json
+*.pyc
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/.env.local
+
+# OS generated files
+.DS_Store
