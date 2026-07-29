@@ -12,20 +12,27 @@ class SheetsService:
             'https://www.googleapis.com/auth/drive'
         ]
         
-        # Check for Render environment variable first
-        creds_json_string = os.getenv("GOOGLE_CREDENTIALS_JSON")
+        # Check if individual env variables exist (Render production)
+        client_email = os.getenv("GOOGLE_CLIENT_EMAIL")
+        private_key = os.getenv("GOOGLE_PRIVATE_KEY")
         
-        if creds_json_string:
-            # Running on Render
-            creds_dict = json.loads(creds_json_string)
+        if client_email and private_key:
+            # Reconstruct newline characters in private key if needed
+            formatted_key = private_key.replace("\\n", "\n")
+            
+            creds_dict = {
+                "type": "service_account",
+                "client_email": client_email,
+                "private_key": formatted_key,
+                "token_uri": "https://oauth2.googleapis.com/token"
+            }
             self.credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
         else:
-            # Running locally
+            # Local development fallback
             creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
             self.credentials = Credentials.from_service_account_file(creds_path, scopes=scopes)
             
         self.client = gspread.authorize(self.credentials)
-
     def extract_sheet_id(self, url: str) -> str:
         match = re.search(r'/d/([a-zA-Z0-9-_]+)', url)
         return match.group(1) if match else None
