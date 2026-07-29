@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from services.scraper import extract_text_from_url
+from fastapi import Query 
 from services.ai import AIService
 from services.sheets import SheetsService
 import re
@@ -49,8 +50,9 @@ async def save_job(request: JobRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @app.get("/api/jobs")
-async def get_jobs(sheet_url: str):
+async def get_jobs(sheet_url: str = Query(..., description="The Google Sheet URL")):
     try:
         jobs = sheets_service.get_latest_jobs(sheet_url)
         return {"status": "success", "data": jobs}
