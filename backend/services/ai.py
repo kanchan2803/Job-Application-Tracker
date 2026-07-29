@@ -14,7 +14,7 @@ class AIService:
         Extract the following job details from the text below. 
         Return ONLY a valid JSON object with these exact keys (use null if missing): 
         "company", "role", "location", "employmentType", "deadline", "skills" (array of strings), 
-        "experience", "batch", "salary", "jobLink", "status" (default to "Saved"), "notes" (any extra useful info).
+        "experience", "batch", "salary", "jobLink","jobID", "status" (default to "Saved"), "notes" (any extra useful info).
         
         Text:
         {text}

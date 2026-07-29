@@ -1,3 +1,4 @@
+import json
 import gspread
 import re
 from google.oauth2.service_account import Credentials
@@ -10,8 +11,19 @@ class SheetsService:
             'https://www.googleapis.com/auth/spreadsheets',
             'https://www.googleapis.com/auth/drive'
         ]
-        creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
-        self.credentials = Credentials.from_service_account_file(creds_path, scopes=scopes)
+        
+        # Check for Render environment variable first
+        creds_json_string = os.getenv("GOOGLE_CREDENTIALS_JSON")
+        
+        if creds_json_string:
+            # Running on Render
+            creds_dict = json.loads(creds_json_string)
+            self.credentials = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+        else:
+            # Running locally
+            creds_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "credentials.json")
+            self.credentials = Credentials.from_service_account_file(creds_path, scopes=scopes)
+            
         self.client = gspread.authorize(self.credentials)
 
     def extract_sheet_id(self, url: str) -> str:
@@ -38,6 +50,7 @@ class SheetsService:
             job_data.get("batch", ""),
             job_data.get("salary", ""),
             job_data.get("jobLink", ""),
+            job_data.get("jobID", ""),
             job_data.get("status", "Saved"),
             "", # Referral (Manual)
             "", # Resume Version (Manual)
