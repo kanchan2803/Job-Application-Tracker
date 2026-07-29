@@ -6,22 +6,31 @@ import { Settings, Save, Briefcase, ExternalLink, RefreshCw } from 'lucide-react
 export default function App() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [jobs, setJobs] = useState([]); // Removed TypeScript <any[]>
+  const [jobs, setJobs] = useState([]);
   const [showSettings, setShowSettings] = useState(false);
-  
+
   const [config, setConfig] = useState({
-  backendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000',
-  sheetUrl: localStorage.getItem('sheetUrl') || '' 
-});
+    backendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000',
+    sheetUrl: (localStorage.getItem('sheetUrl') || '').trim(),
+  });
+
+  // Draft state so typing in the settings box doesn't silently change
+  // "live" config until the user actually hits Save.
+  const [draftSheetUrl, setDraftSheetUrl] = useState(config.sheetUrl);
 
   useEffect(() => {
     if (config.sheetUrl) fetchJobs();
-  }, [config]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.sheetUrl, config.backendUrl]);
 
-  const saveConfig = (newConfig) => {
-    localStorage.setItem('backendUrl', newConfig.backendUrl);
-    localStorage.setItem('sheetUrl', newConfig.sheetUrl);
-    setConfig(newConfig);
+  const saveConfig = () => {
+    const cleanUrl = draftSheetUrl.trim();
+    if (!cleanUrl) {
+      toast.error('Please enter a Google Sheet URL');
+      return;
+    }
+    localStorage.setItem('sheetUrl', cleanUrl);
+    setConfig((prev) => ({ ...prev, sheetUrl: cleanUrl }));
     setShowSettings(false);
     toast.success('Settings saved!');
   };
@@ -29,29 +38,36 @@ export default function App() {
   const fetchJobs = async () => {
     try {
       const res = await axios.get(`${config.backendUrl}/api/jobs`, {
-        params: { sheet_url: config.sheetUrl }
+        params: { sheet_url: config.sheetUrl },
       });
       setJobs(res.data.data);
     } catch (e) {
       console.error(e);
+      toast.error(e.response?.data?.detail || 'Failed to load saved jobs');
     }
   };
 
   const handleSaveJob = async () => {
-    if (!input.trim()) return toast.error('Paste a link or text first');
-    if (!config.sheetUrl) return toast.error('Configure Google Sheet URL in settings');
+    const cleanInput = input.trim();
+    const cleanSheetUrl = config.sheetUrl.trim();
+
+    if (!cleanInput) return toast.error('Paste a link or text first');
+    if (!cleanSheetUrl) return toast.error('Configure Google Sheet URL in settings first');
 
     setLoading(true);
     try {
       await axios.post(`${config.backendUrl}/api/jobs`, {
-        input_text: input,
-        sheet_url: config.sheetUrl
+        input_text: cleanInput,
+        sheet_url: cleanSheetUrl,
       });
       toast.success('Job saved successfully!');
       setInput('');
       fetchJobs();
     } catch (error) {
-      toast.error('Failed to save job');
+      console.error(error);
+      // Show the REAL backend error instead of a generic message
+      const detail = error.response?.data?.detail;
+      toast.error(typeof detail === 'string' ? detail : 'Failed to save job');
     } finally {
       setLoading(false);
     }
@@ -60,14 +76,20 @@ export default function App() {
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 font-sans">
       <Toaster position="top-center" />
-      
+
       {/* Header */}
       <div className="max-w-xl mx-auto flex justify-between items-center mb-8">
         <h1 className="text-xl font-bold flex items-center gap-2">
           <Briefcase className="w-6 h-6 text-blue-600" />
           Job Tracker
         </h1>
-        <button onClick={() => setShowSettings(!showSettings)} className="p-2 bg-white rounded-full shadow-sm">
+        <button
+          onClick={() => {
+            setDraftSheetUrl(config.sheetUrl);
+            setShowSettings(!showSettings);
+          }}
+          className="p-2 bg-white rounded-full shadow-sm"
+        >
           <Settings className="w-5 h-5 text-gray-600" />
         </button>
       </div>
@@ -77,15 +99,20 @@ export default function App() {
         {showSettings && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
             <h2 className="font-semibold text-gray-700">Settings</h2>
-            <input 
+            <input
               type="text"
               placeholder="Google Spreadsheet URL"
               className="w-full p-2 border rounded-lg text-sm"
-              value={config.sheetUrl}
-              onChange={e => setConfig({...config, sheetUrl: e.target.value})}
+              value={draftSheetUrl}
+              onChange={(e) => setDraftSheetUrl(e.target.value)}
             />
-            <button 
-              onClick={() => saveConfig(config)}
+            {config.sheetUrl && (
+              <p className="text-xs text-gray-400 truncate">
+                Currently saved: {config.sheetUrl}
+              </p>
+            )}
+            <button
+              onClick={saveConfig}
               className="w-full bg-gray-800 text-white py-2 rounded-lg text-sm font-medium"
             >
               Save Configuration
@@ -127,9 +154,9 @@ export default function App() {
                 </div>
               </div>
               {(job['Job Link'] || job.jobLink) && (
-                <a 
-                  href={job['Job Link'] || job.jobLink} 
-                  target="_blank" 
+                
+                  href={job['Job Link'] || job.jobLink}
+                  target="_blank"
                   rel="noreferrer"
                   className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg"
                 >
