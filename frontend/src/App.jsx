@@ -14,7 +14,7 @@ export default function App() {
     sheetUrl: (localStorage.getItem('sheetUrl') || '').trim(),
   });
 
-  // Draft state so typing in the settings box doesn't silently change
+  // Draft state so typing in the settings box doesn't change
   // "live" config until the user actually hits Save.
   const [draftSheetUrl, setDraftSheetUrl] = useState(config.sheetUrl);
 
@@ -40,7 +40,7 @@ export default function App() {
       const res = await axios.get(`${config.backendUrl}/api/jobs`, {
         params: { sheet_url: config.sheetUrl },
       });
-      setJobs(res.data.data);
+      setJobs(res.data.data || []);
     } catch (e) {
       console.error(e);
       toast.error(e.response?.data?.detail || 'Failed to load saved jobs');
@@ -65,7 +65,6 @@ export default function App() {
       fetchJobs();
     } catch (error) {
       console.error(error);
-      // Show the REAL backend error instead of a generic message
       const detail = error.response?.data?.detail;
       toast.error(typeof detail === 'string' ? detail : 'Failed to save job');
     } finally {
@@ -143,28 +142,48 @@ export default function App() {
         {/* Recent Jobs */}
         <div className="space-y-3">
           <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider ml-1">Recent Saved</h2>
-          {jobs.map((job, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start gap-4">
-              <div className="overflow-hidden">
-                <h3 className="font-semibold text-gray-800 truncate">{job.Role || job.role || 'Unknown Role'}</h3>
-                <p className="text-sm text-gray-500 truncate">{job.Company || job.company || 'Unknown Company'}</p>
-                <div className="flex gap-2 mt-2">
-                  <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">{job.Status || job.status || 'Saved'}</span>
-                  {job.Deadline && <span className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md">Due: {job.Deadline}</span>}
+
+          {jobs.length === 0 && (
+            <p className="text-sm text-gray-400 ml-1">No jobs saved yet.</p>
+          )}
+
+          {jobs.map((job, idx) => {
+            const role = job.Role || job.role || 'Unknown Role';
+            const company = job.Company || job.company || 'Unknown Company';
+            const status = job.Status || job.status || 'Saved';
+            const deadline = job.Deadline || job.deadline;
+            const jobLink = job['Job Link'] || job.jobLink;
+
+            return (
+              <div
+                key={idx}
+                className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex justify-between items-start gap-4"
+              >
+                <div className="overflow-hidden">
+                  <h3 className="font-semibold text-gray-800 truncate">{role}</h3>
+                  <p className="text-sm text-gray-500 truncate">{company}</p>
+                  <div className="flex gap-2 mt-2">
+                    <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-md">{status}</span>
+                    {deadline && (
+                      <span className="text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md">
+                        Due: {deadline}
+                      </span>
+                    )}
+                  </div>
                 </div>
+                {jobLink && (
+  <a
+    href={jobLink}
+    target="_blank"
+    rel="noreferrer"
+    className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg"
+  >
+    <ExternalLink className="w-5 h-5" />
+  </a>
+)}
               </div>
-              {(job['Job Link'] || job.jobLink) && (
-                
-                  href={job['Job Link'] || job.jobLink}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="p-2 text-gray-400 hover:text-blue-600 bg-gray-50 rounded-lg"
-                >
-                  <ExternalLink className="w-5 h-5" />
-                </a>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
