@@ -10,9 +10,9 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   
   const [config, setConfig] = useState({
-    backendUrl: localStorage.getItem('backendUrl') || 'http://localhost:8000',
-    sheetUrl: localStorage.getItem('sheetUrl') || ''
-  });
+  backendUrl: import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000',
+  sheetUrl: localStorage.getItem('sheetUrl') || '' 
+});
 
   useEffect(() => {
     if (config.sheetUrl) fetchJobs();
@@ -77,13 +77,6 @@ export default function App() {
         {showSettings && (
           <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 space-y-4">
             <h2 className="font-semibold text-gray-700">Settings</h2>
-            <input 
-              type="text"
-              placeholder="Backend URL (e.g. http://localhost:8000)"
-              className="w-full p-2 border rounded-lg text-sm"
-              value={config.backendUrl}
-              onChange={e => setConfig({...config, backendUrl: e.target.value})}
-            />
             <input 
               type="text"
               placeholder="Google Spreadsheet URL"
